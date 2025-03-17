@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HCC Digital Gate Pass</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@7.12.15/dist/sweetalert2.all.min.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .form-container {
+            max-width: 100%;
+            width: 100%;
+            margin: 20px auto;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            background-color: #ffffff;
+            border-radius: 12px;
+        }
+        .form-group label {
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            border: none;
+            border-radius: 25px;
+            padding: 10px 20px;
+            font-weight: bold;
+        }
+        input, textarea {
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="form-container">
+            <h4 class="text-center mb-4">DIGITAL GATE PASS</h4>
+            <form id="submit-to-google-sheet">
+                <!-- Basic Information -->
+                <div class="form-group">
+                    <label>First Name:</label>
+                    <input class="form-control" type="text" name="firstName" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Middle Name:</label>
+                    <input class="form-control" type="text" name="middleName">
+                </div>
+
+                <div class="form-group">
+                    <label>Last Name:</label>
+                    <input class="form-control" type="text" name="lastName" required>
+                </div>
+
+                <!-- Company Details -->
+                <div class="form-group">
+                    <label>Company:</label>
+                    <input class="form-control" type="text" name="company" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Designation:</label>
+                    <input class="form-control" type="text" name="designation" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Contact Number:</label>
+                    <input class="form-control" type="text" name="contactNumber" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Purpose of Visit:</label>
+                    <textarea class="form-control" name="purpose" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Person to Visit:</label>
+                    <input class="form-control" type="text" name="personToVisit" required>
+                </div>
+
+                <!-- Vehicle Information -->
+                <div class="form-group">
+                    <label>Vehicle Brand:</label>
+                    <input class="form-control" type="text" name="vehicleBrand">
+                </div>
+
+                <div class="form-group">
+                    <label>Vehicle Plate Number:</label>
+                    <input class="form-control" type="text" name="vehiclePlate">
+                </div>
+
+                <!-- ID Uploads -->
+                <div class="form-group">
+                    <label>Upload Company ID (Optional):</label>
+                    <input class="form-control-file" type="file" name="companyID" id="companyID">
+                </div>
+
+                <div class="form-group">
+                    <label>Upload Additional ID (Required):</label>
+                    <input class="form-control-file" type="file" name="additionalID" id="additionalID" required>
+                </div>
+
+                <!-- People Count & Names -->
+                <div class="form-group">
+                    <label>Number of People with You:</label>
+                    <input class="form-control" type="number" name="peopleCount" min="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label>List Their Names:</label>
+                    <textarea class="form-control" name="peopleNames" rows="3" required></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block">Submit</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const scriptURL = "https://script.google.com/macros/s/AKfycbwMLY3b91PctpIMBz9XJvDFDbtDTqkujHkN5mtCNtYvsrtpUYINOGdib4bL1-pZvB6Q/exec";
+        const form = document.forms["submit-to-google-sheet"];
+    
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+    
+            const formData = new FormData(form);
+    
+            // Handle File Uploads
+            const fileFields = ["companyID", "additionalID"];
+            let errorFlag = false;
+    
+            // Create a Promise array to ensure all files load before submission
+            const filePromises = fileFields.map((field) => {
+                return new Promise((resolve, reject) => {
+                    const fileInput = document.getElementById(field);
+                    if (fileInput.files.length > 0) {
+                        const file = fileInput.files[0];
+                        const reader = new FileReader();
+    
+                        if (file.size > 5 * 1024 * 1024) {
+                            swal("Error", `${field} file size should be less than 5MB.`, "error");
+                            reject(); // Prevent form submission
+                        }
+    
+                        reader.onload = function () {
+                            formData.append(field, reader.result.split(",")[1]);
+                            formData.append(`${field}Type`, file.type);
+                            resolve(); // Proceed once the file is processed
+                        };
+    
+                        reader.readAsDataURL(file);
+                    } else if (field === "additionalID") {
+                        errorFlag = true; // Required 'Additional ID' missing
+                        reject();
+                    } else {
+                        resolve(); // Proceed if optional file is missing
+                    }
+                });
+            });
+    
+            try {
+                await Promise.all(filePromises);
+    
+                if (errorFlag) {
+                    swal("Error", "Please upload the Additional ID.", "error");
+                    return;
+                }
+    
+                await submitForm(formData);
+            } catch (error) {
+                swal("Error", "Something went wrong. Please try again!", "error");
+            }
+        });
+    
+        async function submitForm(formData) {
+            const submitButton = document.querySelector("button[type='submit']");
+            submitButton.disabled = true;
+            submitButton.innerText = "Loading...";
+    
+            fetch(scriptURL, { method: "POST", body: formData })
+                .then(() => {
+                    swal("Done", "Submitted Successfully.", "success");
+                    form.reset();
+                })
+                .catch(() => {
+                    swal("Error", "Something went wrong. Please try again!", "error");
+                })
+                .finally(() => {
+                    submitButton.disabled = false;
+                    submitButton.innerText = "Submit";
+                });
+        }
+    </script>
+    
+</body>
+</html>
